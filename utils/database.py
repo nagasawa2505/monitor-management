@@ -1,21 +1,21 @@
 # Supabase関連処理
-from supabase import create_client, Client
+
+import streamlit as st
+from supabase import create_client
 from .logger import get_logger
 
+# ログ準備
 logger = get_logger(__name__)
 
+supabase_url = st.secrets["SUPABASE_URL"]
+supabase_key = st.secrets["SUPABASE_KEY"]
+
 # Supabase接続を返す
-def get_client(url: str, key: str):
+@st.cache_resource(ttl=3600)
+def get_supabase_client():
     try:
-        client = create_client(url, key)
+        client = create_client(supabase_url, supabase_key)
         return client
     except Exception as e:
-        logger.error(f"{e} url:{url} key:{key}")
+        logger.error(f"{e} url:{supabase_url} key:{supabase_key}")
         return None
-
-#def get_products(_supabase: Client):
-#    if _supabase is None:
-#        logger.error("Supabase接続がありません")
-#        return None
-#    res = _supabase.table("product").select("*").execute()
-#    return res.data
