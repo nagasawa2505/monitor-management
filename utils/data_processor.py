@@ -11,26 +11,8 @@ from utils import constant
 from utils import database
 from .logger import get_logger
 
-# ログ準備
-logger = get_logger(__name__)
-
-# Supabase接続取得
-supabase = database.get_supabase_client()
-
-# ブランド名 -> ID変換用
-id_by_brand = {}
-res = supabase.table("brands").select("id, name").execute()
-for row in res.data:
-    id_by_brand[row["name"]] = row["id"]
-
-# パネル方式名 -> ID変換用
-id_by_panel_type = {}
-res = supabase.table("panel_types").select("id, name").execute()
-for row in res.data:
-    id_by_panel_type[row["name"]] = row["id"]
-
 # 製品テーブル列チェック用
-column_defs_products = {
+COLUMN_DEFS_PRODUCTS = {
     "product_id":     {"required": True,  "type": str, "max_length": 100},
     "model_name":     {"required": True,  "type": str, "max_length": 100},
     "brand_id":       {},
@@ -45,8 +27,18 @@ column_defs_products = {
     "status":         {"required": True,  "type": str, "allowed": ["active", "discontinued"]}
 }
 
-# 製品CSVインポートチェック
-def validate_csv_products(df: pd.DataFrame, errors: list) -> bool:
+# ブランドテーブル列チェック用
+COLUMN_DEFS_BRANDS = {
+    "name": {"required": True,  "type": str, "max_length": 100},
+}
+
+# パネル方式テーブル列チェック用
+COLUMN_DEFS_PANEL_TYPES = {
+    "name": {"required": True,  "type": str, "max_length": 100},
+}
+
+# 製品バリデーション
+def validate_products(df: pd.DataFrame, errors: list) -> bool:
     # ブランドチェック
     if "brand" not in df.columns:
         errors.append(f"行 {idx + 1}: brand は必須項目です")
@@ -83,10 +75,20 @@ def validate_csv_products(df: pd.DataFrame, errors: list) -> bool:
                 errors.append(f"行 {idx + 1}: 重複する product_id が存在します")
 
     # 共通チェック
-    return validate_csv(column_defs_products, df, errors)
+    return validate_data(COLUMN_DEFS_PRODUCTS, df, errors)
 
-# CSVインポート共通チェック
-def validate_csv(column_defs: dict, df: pd.DataFrame, errors: list) -> bool:
+# ブランドバリデーション
+def validate_brands(df: pd.DataFrame, errors: list) -> bool:
+    # 共通チェック
+    return validate_data(COLUMN_DEFS_BRANDS, df, errors)
+
+# パネル方式バリデーション
+def validate_panel_types(df: pd.DataFrame, errors: list) -> bool:
+    # 共通チェック
+    return validate_data(COLUMN_DEFS_PANEL_TYPES, df, errors)
+
+# 共通バリデーション
+def validate_data(column_defs: dict, df: pd.DataFrame, errors: list) -> bool:
     # 行ループ
     for idx, row in df.iterrows():
         row_prefix = f"行 {idx + 1}: "
@@ -141,8 +143,29 @@ def validate_csv(column_defs: dict, df: pd.DataFrame, errors: list) -> bool:
 
     return len(errors) == 0
 
+# ブランド名 -> ID変換データ作成
+def get_id_by_brand() -> dict:
+    id_by_brand = {}
+    supabase = database.get_supabase_client()
+    res = supabase.table("brands").select("id, name").execute()
+    for row in res.data:
+        id_by_brand[row["name"]] = row["id"]
+    
+    return id_by_brand
+
+# パネル方式名 -> ID変換データ作成
+def get_id_by_panel_type() -> dict:
+    id_by_panel_type = {}
+    supabase = database.get_supabase_client()
+    res = supabase.table("panel_types").select("id, name").execute()
+    for row in res.data:
+        id_by_panel_type[row["name"]] = row["id"]
+    
+    return id_by_panel_type
+
 # ブランドをIDに変換
 def convert_brand_to_id(df: pd.DataFrame, errors: list):
+    id_by_brand = get_id_by_brand()
     for idx, value in df["brand"].items():
         id = id_by_brand.get(value, None)
         if not id:
@@ -157,6 +180,7 @@ def convert_brand_to_id(df: pd.DataFrame, errors: list):
 
 # IDをブランドに変換
 def convert_id_to_brand(df: pd.DataFrame):
+    id_by_brand = get_id_by_brand()
     brand_by_id = {v: k for k, v in id_by_brand.items()}
     for idx, value in df["brand_id"].items():
         name = brand_by_id.get(value, None)
@@ -165,6 +189,7 @@ def convert_id_to_brand(df: pd.DataFrame):
 
 # パネル方式をIDに変換
 def convert_panel_type_to_id(df: pd.DataFrame, errors: list):
+    id_by_panel_type = get_id_by_panel_type()
     for idx, value in df["panel_type"].items():
         id = id_by_panel_type.get(value, None)
         if not id:
@@ -179,6 +204,7 @@ def convert_panel_type_to_id(df: pd.DataFrame, errors: list):
 
 # IDをパネル方式に変換
 def convert_id_to_panel_type(df: pd.DataFrame):
+    id_by_panel_type = get_id_by_panel_type()
     panel_type_by_id = {v: k for k, v in id_by_panel_type.items()}
     for idx, value in df["panel_type_id"].items():
         name = panel_type_by_id.get(value, None)
@@ -202,8 +228,22 @@ def concat_resolution_all(df: pd.DataFrame):
     df.drop(columns=["resolution_w"], inplace=True)
     df.drop(columns=["resolution_h"], inplace=True)
 
+# タイムスタンプを表示用に変換
+def convert_timestamp(df: pd.DataFrame):
+    for col in ["created_at", "updated_at"]:
+        df[col] = pd.to_datetime(df[col], utc=True)
+
+    # 日本時間に変換
+    df["created_at"] = df["created_at"].dt.tz_convert("Asia/Tokyo")
+    df["updated_at"] = df["updated_at"].dt.tz_convert("Asia/Tokyo")
+
+    # フォーマット変換
+    df["created_at"] = df["created_at"].dt.strftime("%Y-%m-%d %H:%M")
+    df["updated_at"] = df["updated_at"].dt.strftime("%Y-%m-%d %H:%M")
+
 # 製品データを編集用に変換
 def convert_products_to_edit(df: pd.DataFrame):
+    convert_timestamp(df)
     convert_id_to_brand(df)
     convert_id_to_panel_type(df)
     concat_resolution_all(df)

@@ -142,7 +142,7 @@ if auth.has_session():
             # チェックしてエラーを表示
             errors = []
             validated_df = edited_df.copy()
-            if data_processor.validate_csv_products(validated_df, errors) is False:
+            if data_processor.validate_products(validated_df, errors) is False:
                 for e in errors:
                     st.error(e)
 
@@ -226,7 +226,7 @@ if auth.has_session():
                 # チェックしてエラーを表示
                 validated_df = edited_df.copy()
                 errors = []
-                if data_processor.validate_csv_products(validated_df, errors) is False:
+                if data_processor.validate_products(validated_df, errors) is False:
                     for e in errors:
                         st.error(e)
 
@@ -250,13 +250,74 @@ if auth.has_session():
     # ブランド管理
     elif page == constant.PAGE_NAME_BRAND_MANAGEMENT:
         st.subheader(constant.PAGE_NAME_BRAND_MANAGEMENT)
-        st.write("未実装")
+        try:
+            # DBからデータ取得
+            res = supabase.table("brands").select("*").order("id").execute()
+        except Exception as e:
+            logger.error(e)
+            st.error("ブランドデータを取得できませんでした")
+    
+        df = pd.DataFrame(res.data)
+        data_processor.convert_timestamp(df)
+        edited_df = st.data_editor(df, num_rows="dynamic", key=f"editor_brands")
+
+        # チェックしてエラーを表示
+        validated_df = edited_df.copy()
+        errors = []
+        if data_processor.validate_brands(validated_df, errors) is False:
+            for e in errors:
+                st.error(e)
+
+        # 保存ボタン
+        if st.button("保存"):
+            if len(errors) != 0:
+                st.error("編集内容を保存できませんでした  \nファイルの内容を確認してください")
+            else:
+                # 登録用に変換
+                records = validated_df.to_dict(orient="records")
+                try:
+                    # DB登録/更新
+                    supabase.table("brands").upsert(records).execute()
+                    st.success("保存しました")
+                except Exception as e:
+                    logger.error(e)
+                    st.error(f"保存できませんでした  \n{e}")
 
     # パネル方式管理
     elif page == constant.PAGE_NAME_PANEL_TYPE_MANAGEMENT:
         st.subheader(constant.PAGE_NAME_PANEL_TYPE_MANAGEMENT)
-        st.write("未実装")
+        try:
+            # DBからデータ取得
+            res = supabase.table("panel_types").select("*").order("id").execute()
+        except Exception as e:
+            logger.error(e)
+            st.error("パネル方式データを取得できませんでした")
+    
+        df = pd.DataFrame(res.data)
+        data_processor.convert_timestamp(df)
+        edited_df = st.data_editor(df, num_rows="dynamic", key=f"editor_panel_types")
 
+        # チェックしてエラーを表示
+        validated_df = edited_df.copy()
+        errors = []
+        if data_processor.validate_panel_types(validated_df, errors) is False:
+            for e in errors:
+                st.error(e)
+
+        # 保存ボタン
+        if st.button("保存"):
+            if len(errors) != 0:
+                st.error("編集内容を保存できませんでした  \nファイルの内容を確認してください")
+            else:
+                # 登録用に変換
+                records = validated_df.to_dict(orient="records")
+                try:
+                    # DB登録/更新
+                    supabase.table("panel_types").upsert(records).execute()
+                    st.success("保存しました")
+                except Exception as e:
+                    logger.error(e)
+                    st.error(f"保存できませんでした  \n{e}")
     # ダッシュボード
     else:
         # DBからデータ取得
@@ -276,6 +337,7 @@ if auth.has_session():
 
         res = supabase.table("products").select("*").order("created_at", desc=True).limit(10).execute()
         df_recent = pd.DataFrame(res.data)
+        data_processor.convert_timestamp(df_recent)
 
         st.write("最近登録された商品")
         if not df_recent.empty:
@@ -303,11 +365,11 @@ else:
             elif not input_password:
                 st.warning("パスワードを入力してください")
             else:
-                is_success = auth.login(supabase, input_email, input_password)
+                is_success = auth.login(input_email, input_password)
                 if is_success:
-                    st.success("ログインしました")
                     st.rerun()
                 else:
+                    logger.error(f"email: {input_email}, password: {input_password}")
                     st.error("ログインできません  \nメールアドレス、パスワードを確認してください")
 
 # フッター表示

@@ -1,6 +1,6 @@
 # 定数定義
 
-PAGE_NAME_HOME = "ダッシュボード"
+PAGE_NAME_HOME = "ホーム"
 PAGE_NAME_PRODUCTS_EDITOR = "データ編集"
 PAGE_NAME_IMPORT = "データインポート"
 PAGE_NAME_BRAND_MANAGEMENT = "ブランド管理"
