@@ -1,14 +1,17 @@
 # Supabase関連処理
 
 import streamlit as st
+import os
 from supabase import create_client
 from .logger import get_logger
 
 # ログ準備
 logger = get_logger(__name__)
 
-supabase_url = st.secrets["SUPABASE_URL"]
-supabase_key = st.secrets["SUPABASE_KEY"]
+# supabase_url = st.secrets["SUPABASE_URL"]
+# supabase_key = st.secrets["SUPABASE_KEY"]
+supabase_url = os.environ["SUPABASE_URL"]
+supabase_key = os.environ["SUPABASE_KEY"]
 
 # Supabase接続を返す
 @st.cache_resource(ttl=3600)
