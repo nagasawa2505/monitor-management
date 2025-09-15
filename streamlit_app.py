@@ -179,24 +179,24 @@ if auth.has_session():
                             logger.error(e)
                             st.error(f"保存できませんでした  \n{e}")
 
-                # 削除対象を取得
-                db_ids = supabase.table("products").select("product_id").execute()
-                db_ids = [row["product_id"] for row in db_ids.data]
-                df_ids = [row["product_id"] for row in records]
-                ids_to_delete = list(set(db_ids) - set(df_ids))
-                delete_len = len(ids_to_delete)
+            # 削除対象を取得
+            db_ids = supabase.table("products").select("product_id").execute()
+            db_ids = [row["product_id"] for row in db_ids.data]
+            df_ids = [row["product_id"] for row in records]
+            ids_to_delete = list(set(db_ids) - set(df_ids))
+            delete_len = len(ids_to_delete)
 
-                # 削除の保存
-                if ids_to_delete:
-                    if st.button("削除を保存", type="primary"):
-                        try:
-                            # 削除
-                            supabase.table("products").delete().in_("product_id", ids_to_delete).execute()
-                            st.success("保存しました")
-                        except Exception as e:
-                            logger.error(e)
-                            st.error(f"保存できませんでした  \n{e}")
-                    st.write(f"**※ {delete_len} 件が削除されます**")
+            # 削除の保存
+            if ids_to_delete:
+                if st.button("削除を保存", type="primary"):
+                    try:
+                        # 削除
+                        supabase.table("products").delete().in_("product_id", ids_to_delete).execute()
+                        st.success("保存しました")
+                    except Exception as e:
+                        logger.error(e)
+                        st.error(f"保存できませんでした  \n{e}")
+                st.write(f"**※ {delete_len} 件が削除されます**")
 
     # CSVインポート
     elif page == constant.PAGE_NAME_IMPORT:
